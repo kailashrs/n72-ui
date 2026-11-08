@@ -5,6 +5,8 @@ A touch launcher for Linux on the iPod touch 2G (N72AP), built on
 
 - Home screen with a clock and six apps: LVGL's Widgets and Music demos,
   Paint (finger drawing), Settings (brightness), System (live stats) and Power.
+![Home screen](screenshot-home.png)
+
 - Buttons: Home returns to the launcher (the demos restart the process),
   Power turns the backlight off and on, the volume keys change the brightness.
 
@@ -28,3 +30,12 @@ boot (add `noui` to the kernel command line to skip it).
 | `N72_TOUCH_CAL` | `min_x min_y max_x max_y` raw touch range; swap a pair to flip an axis |
 | `N72_TOUCH_SWAP` | `1` swaps the touch axes |
 | `TZ` | Clock time zone (the initramfs sets it from `/etc/TZ`) |
+
+## Kernel
+
+Runs on the n72 branch of [kailashrs/linux](https://github.com/kailashrs/linux/tree/n72)
+(simplefb display, Zephyr2 touchscreen, gpio-keys).
+
+## License
+
+MIT (see `LICENSE`). LVGL is MIT-licensed as well.
