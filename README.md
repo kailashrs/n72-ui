@@ -10,6 +10,23 @@ A touch launcher for Linux on the iPod touch 2G (N72AP), built on
 - Buttons: Home returns to the launcher (the demos restart the process),
   Power turns the backlight off and on, the volume keys change the brightness.
 
+## GPU
+
+When `/dev/mbx` exists (the PowerVR MBX Lite driver in the n72 kernel), n72-ui
+draws through the GPU's 2D engine (`mbx_gpu.c`):
+
+- every LVGL draw buffer comes from one GPU-mapped, CPU-cached pool;
+- large plain fills (no radius, no gradient, opaque) run on the GPU;
+- the display renders into a full-screen pool buffer and the GPU copies the
+  refreshed areas to the framebuffer.
+
+`n72-ui --bench` times full-screen redraws; `N72_GPU=0` forces the CPU path.
+
+| Scene | CPU | GPU |
+| --- | --- | --- |
+| Home screen | 34.9 ms | 24.1 ms |
+| 24 plain rectangles | 13.2 ms | 9.9 ms |
+
 ## Build
 
 LVGL goes in `../lvgl-src/lvgl` (`git clone -b v9.2.2 https://github.com/lvgl/lvgl`).
@@ -29,6 +46,7 @@ boot (add `noui` to the kernel command line to skip it).
 | `N72_TOUCH` / `N72_KEYS` | Event devices (default: found by name) |
 | `N72_TOUCH_CAL` | `min_x min_y max_x max_y` raw touch range; swap a pair to flip an axis |
 | `N72_TOUCH_SWAP` | `1` swaps the touch axes |
+| `N72_GPU` | `0` draws with the CPU only (default: GPU when `/dev/mbx` exists) |
 | `TZ` | Clock time zone (the initramfs sets it from `/etc/TZ`) |
 
 ## Kernel

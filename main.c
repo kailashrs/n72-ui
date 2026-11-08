@@ -13,6 +13,10 @@
  *   N72_TOUCH_CAL  "min_x min_y max_x max_y" raw touch range; swap min and
  *                  max to flip an axis (default: the device's own range)
  *   N72_TOUCH_SWAP set to 1 to swap the touch axes
+ *   N72_GPU        set to 0 to draw with the CPU only (default: MBX GPU
+ *                  through /dev/mbx when present)
+ *
+ * n72-ui --bench times full-screen redraws and exits.
  */
 
 #include <dirent.h>
@@ -33,6 +37,7 @@
 
 #include "lvgl/lvgl.h"
 #include "lvgl/demos/lv_demos.h"
+#include "mbx_gpu.h"
 
 #define W 320
 #define H 480
@@ -684,6 +689,54 @@ static void keys_poll(lv_timer_t *t)
 	}
 }
 
+/* ---------------------------------------------------------------- bench */
+
+static double redraw_ms(int n)
+{
+	uint32_t t0;
+	int i;
+
+	lv_refr_now(NULL);
+	t0 = tick_ms();
+	for (i = 0; i < n; i++) {
+		lv_obj_invalidate(lv_screen_active());
+		lv_refr_now(NULL);
+	}
+	return (double)(tick_ms() - t0) / n;
+}
+
+/* Redraw the home screen, then a fill-heavy screen of plain rectangles. */
+static int bench(void)
+{
+	lv_obj_t *scr;
+	double home, rects;
+	int i;
+
+	home = redraw_ms(20);
+
+	scr = lv_obj_create(NULL);
+	lv_obj_set_style_bg_color(scr, lv_color_hex(0x203040), 0);
+	lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
+	for (i = 0; i < 24; i++) {
+		lv_obj_t *r = lv_obj_create(scr);
+
+		lv_obj_set_size(r, 96, 72);
+		lv_obj_set_pos(r, 8 + (i % 3) * 104, 8 + (i / 3) * 58);
+		lv_obj_set_style_radius(r, 0, 0);
+		lv_obj_set_style_border_width(r, 0, 0);
+		lv_obj_set_style_bg_color(r, lv_color_hsv_to_rgb(i * 15, 70, 90), 0);
+	}
+	lv_screen_load(scr);
+	rects = redraw_ms(20);
+
+	printf("n72-ui bench (%s): home screen %.1f ms, 24 rectangles %.1f ms per full redraw\n",
+	       mbx_gpu_stats.submits ? "GPU" : "CPU", home, rects);
+	printf("  GPU submits %lu, fills %lu, flushes %lu, pool misses %lu\n",
+	       mbx_gpu_stats.submits, mbx_gpu_stats.fills, mbx_gpu_stats.flushes,
+	       mbx_gpu_stats.pool_misses);
+	return 0;
+}
+
 /* ----------------------------------------------------------------- main */
 
 static void restore_tty(void)
@@ -725,8 +778,13 @@ int main(int argc, char **argv)
 	lv_tick_set_cb(tick_ms);
 	backlight_init();
 
-	disp = lv_linux_fbdev_create();
-	lv_linux_fbdev_set_file(disp, fb ? fb : "/dev/fb0");
+	disp = NULL;
+	if (!getenv("N72_GPU") || strcmp(getenv("N72_GPU"), "0"))
+		disp = mbx_gpu_display_create();
+	if (!disp) {
+		disp = lv_linux_fbdev_create();
+		lv_linux_fbdev_set_file(disp, fb ? fb : "/dev/fb0");
+	}
 	lv_theme_default_init(disp, lv_palette_main(LV_PALETTE_BLUE),
 			      lv_palette_main(LV_PALETTE_PINK), true,
 			      &lv_font_montserrat_14);
@@ -754,6 +812,8 @@ int main(int argc, char **argv)
 	lv_timer_create(keys_poll, 30, NULL);
 
 	build_home();
+	if (argc > 1 && !strcmp(argv[1], "--bench"))
+		return bench();
 
 	for (;;) {
 		uint32_t idle = lv_timer_handler();

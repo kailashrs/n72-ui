@@ -7,7 +7,7 @@ UI="$ROOT/n72-ui"
 LVGL="$ROOT/lvgl-src/lvgl"
 OUT="$ROOT/n72-ui-build"
 CC=arm-linux-gnueabi-gcc
-CFLAGS="-O2 -mcpu=arm1176jzf-s -mfpu=vfp -mfloat-abi=softfp -ffunction-sections -fdata-sections -DLV_CONF_INCLUDE_SIMPLE -I$UI -I$ROOT/lvgl-src"
+CFLAGS="-O2 -idirafter $ROOT/linux-s5l87xx/include/uapi -mcpu=arm1176jzf-s -mfpu=vfp -mfloat-abi=softfp -ffunction-sections -fdata-sections -DLV_CONF_INCLUDE_SIMPLE -I$UI -I$ROOT/lvgl-src"
 mkdir -p "$OUT/obj"
 SRCS=$(find "$LVGL/src" "$LVGL/demos/widgets" "$LVGL/demos/music" -name '*.c'; echo "$LVGL/demos/lv_demos.c")
 obj() { echo "$OUT/obj/$(echo "${1#$LVGL/}" | tr '/' '_' | sed 's/\.c$/.o/')"; }
@@ -19,6 +19,7 @@ for f in $SRCS; do
 	fi
 done | xargs -P "$(nproc)" -I{} sh -c '{}'
 $CC $CFLAGS -c "$UI/main.c" -o "$OUT/obj/main.o"
-$CC -static -Wl,--gc-sections -o "$OUT/n72-ui" "$OUT/obj/main.o" $OBJS -lm
+$CC $CFLAGS -c "$UI/mbx_gpu.c" -o "$OUT/obj/mbx_gpu.o"
+$CC -static -Wl,--gc-sections -o "$OUT/n72-ui" "$OUT/obj/main.o" "$OUT/obj/mbx_gpu.o" $OBJS -lm
 arm-linux-gnueabi-strip "$OUT/n72-ui"
 ls -l "$OUT/n72-ui"
